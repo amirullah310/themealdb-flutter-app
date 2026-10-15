@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 /// Pesan error + tombol coba lagi. Dipakai di halaman katalog dan detail.
+/// Dengan widget terpisah ini, kode tampilan error tidak perlu ditulis
+/// dua kali (pada Latihan 2 dan 3 kode yang sama masih ditulis langsung).
 class TampilanError extends StatelessWidget {
   const TampilanError({super.key, required this.pesan, required this.onCobaLagi});
 
-  final String pesan;
-  final VoidCallback onCobaLagi;
+  final String pesan;              // isi pesan error yang ditampilkan
+  final VoidCallback onCobaLagi;   // fungsi yang dijalankan saat tombol ditekan
+                                   // (diisi muatUlang oleh halaman pemanggil)
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +16,7 @@ class TampilanError extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,   // isi di tengah layar
           children: [
             const Icon(Icons.cloud_off, size: 56, color: Colors.grey),
             const SizedBox(height: 16),

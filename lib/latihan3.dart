@@ -4,22 +4,31 @@
 // Model, layanan API, dan tampilan daftar sama seperti Latihan 2.
 // Yang berubah hanya _HalamanKatalogState: loading, error, dan data
 // sekarang ditangani oleh satu widget FutureBuilder.
+//
+// Perbandingan dengan Latihan 2:
+//   Latihan 2 → 3 variabel state (sedangMemuat, pesanError, daftarMeal),
+//               try/catch, dan cek `mounted` ditulis sendiri.
+//   Latihan 3 → cukup 1 variabel (futureMeal). FutureBuilder memantau
+//               Future tersebut dan membangun ulang tampilan otomatis
+//               setiap kali statusnya berubah.
 
-import 'dart:convert';
+import 'dart:convert';                    // jsonDecode
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart' as http;  // permintaan HTTP
 
 import 'tema.dart';
 
+/// Endpoint daftar resep kategori Seafood.
 const String urlDaftar =
     'https://www.themealdb.com/api/json/v1/1/filter.php?c=Seafood';
 
 // ---------------- MODEL ----------------
+/// Representasi satu resep dari respons filter.php.
 class Meal {
-  final String id;
-  final String nama;
-  final String gambar;
-  final String area;
+  final String id;      // idMeal
+  final String nama;    // strMeal
+  final String gambar;  // strMealThumb (URL gambar)
+  final String area;    // strArea
 
   const Meal({
     required this.id,
@@ -28,6 +37,7 @@ class Meal {
     required this.area,
   });
 
+  /// Membuat Meal dari Map JSON; key yang tidak ada diganti nilai default.
   factory Meal.fromJson(Map<String, dynamic> json) {
     return Meal(
       id: json['idMeal'] as String? ?? '',
@@ -39,6 +49,9 @@ class Meal {
 }
 
 // ---------------- LAYANAN API ----------------
+/// Mengambil daftar resep dan mengubahnya menjadi `List<Meal>`.
+/// Exception yang dilempar di sini akan ditangkap otomatis oleh
+/// FutureBuilder dan muncul sebagai `snapshot.hasError`.
 Future<List<Meal>> ambilDaftarMeal() async {
   final response = await http.get(Uri.parse(urlDaftar));
 
@@ -57,6 +70,7 @@ Future<List<Meal>> ambilDaftarMeal() async {
 // ---------------- TAMPILAN ----------------
 void main() => runApp(const MyApp());
 
+/// Widget akar: mengatur tema dan halaman pertama.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -70,6 +84,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+/// Halaman katalog resep versi FutureBuilder.
 class HalamanKatalog extends StatefulWidget {
   const HalamanKatalog({super.key});
 
@@ -79,6 +94,10 @@ class HalamanKatalog extends StatefulWidget {
 
 class _HalamanKatalogState extends State<HalamanKatalog> {
   // Future disimpan di variabel, BUKAN dibuat langsung di dalam build().
+  // Jika ditulis `future: ambilDaftarMeal()` di build(), setiap kali
+  // build() dipanggil ulang (misalnya saat setState atau layar diputar)
+  // permintaan HTTP baru akan terkirim dan loading muncul terus-menerus.
+  // `late` = variabel pasti diisi sebelum dipakai (diisi di initState).
   late Future<List<Meal>> futureMeal;
 
   @override
@@ -87,6 +106,7 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
     futureMeal = ambilDaftarMeal(); // permintaan dikirim sekali saja
   }
 
+  /// Dipanggil oleh tombol refresh, tombol Coba Lagi, dan tarik-ke-bawah.
   void muatUlang() {
     setState(() {
       futureMeal = ambilDaftarMeal(); // permintaan baru → FutureBuilder membangun ulang
@@ -99,6 +119,7 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
       appBar: AppBar(
         title: const Text('Katalog Resep (FutureBuilder)'),
         actions: [
+          // Tombol refresh di pojok kanan AppBar.
           IconButton(
             onPressed: muatUlang,
             icon: const Icon(Icons.refresh),
@@ -106,6 +127,11 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
           ),
         ],
       ),
+      // FutureBuilder memantau `futureMeal`. Fungsi builder dipanggil ulang
+      // setiap status Future berubah; `snapshot` berisi status terbarunya:
+      //   snapshot.connectionState → waiting / done
+      //   snapshot.hasError / snapshot.error → jika Future gagal
+      //   snapshot.data → hasil List<Meal> jika berhasil
       body: FutureBuilder<List<Meal>>(
         future: futureMeal,
         builder: (context, snapshot) {
@@ -115,6 +141,8 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
           }
 
           // ---- Keadaan 2: gagal ----
+          // Terjadi jika ambilDaftarMeal() melempar Exception
+          // (status bukan 200, tidak ada internet, dsb.).
           if (snapshot.hasError) {
             return Center(
               child: Padding(
@@ -130,7 +158,7 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${snapshot.error}',
+                      '${snapshot.error}',   // isi pesan Exception
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 12),
                     ),
@@ -147,11 +175,15 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
           }
 
           // ---- Keadaan 3: berhasil ----
+          // snapshot.data bertipe List<Meal>? (bisa null), jadi diberi
+          // cadangan list kosong dengan ??.
           final daftar = snapshot.data ?? [];
           if (daftar.isEmpty) {
             return const Center(child: Text('Tidak ada data untuk kategori ini.'));
           }
 
+          // Tarik ke bawah untuk memuat ulang. onRefresh membutuhkan fungsi
+          // yang mengembalikan Future, maka muatUlang() dibungkus `async`.
           return RefreshIndicator(
             onRefresh: () async => muatUlang(),
             child: ListView.builder(
@@ -171,6 +203,7 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
                       horizontal: 12,
                       vertical: 8,
                     ),
+                    // Gambar resep dengan sudut membulat.
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
@@ -178,6 +211,7 @@ class _HalamanKatalogState extends State<HalamanKatalog> {
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
+                        // Ikon pengganti jika gambar gagal dimuat.
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: 64,
                           height: 64,
